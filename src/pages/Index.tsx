@@ -3,13 +3,11 @@ import { Subject } from "@/types/subject";
 import { getStoredSubjects, saveSubjects, getStorageInfo } from "@/lib/storage";
 import { Header } from "@/components/Header";
 import { SubjectCard } from "@/components/SubjectCard";
-import { AddSubjectDialog } from "@/components/AddSubjectDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -60,39 +58,6 @@ const Index = () => {
       return false;
     }
     return true;
-  };
-
-  const handleAddSubject = (subject: Subject) => {
-    let updatedSubjects;
-    
-    if (editingSubject) {
-      updatedSubjects = subjects.map(s => s.id === subject.id ? subject : s);
-      setEditingSubject(null);
-      toast({
-        title: "Subject updated",
-        description: `${subject.name} has been updated successfully.`,
-      });
-    } else {
-      if (subjects.length >= 2) {
-        toast({
-          title: "Free plan limit reached",
-          description: "You can only track 2 subjects in the free plan. Upgrade to Premium for unlimited subjects.",
-          variant: "destructive",
-        });
-        return;
-      }
-      updatedSubjects = [...subjects, subject];
-      toast({
-        title: "Subject added",
-        description: `${subject.name} has been added to your tracker.`,
-      });
-    }
-    
-    const success = performSave(updatedSubjects, editingSubject ? "subject update" : "subject addition");
-    if (!success) {
-      // Reset editing state even if save failed
-      setEditingSubject(null);
-    }
   };
 
   const handleAttended = (subjectId: string) => {
@@ -194,12 +159,46 @@ const Index = () => {
 
   const handleEditSubject = (subject: Subject) => {
     setEditingSubject(subject);
-    setShowAddDialog(true);
+    // Create inline form for editing
+    const newName = prompt("Enter new subject name:", subject.name);
+    if (newName && newName.trim()) {
+      const updatedSubjects = subjects.map(s => 
+        s.id === subject.id 
+          ? { ...s, name: newName.trim() }
+          : s
+      );
+      setSubjects(updatedSubjects);
+      saveSubjects(updatedSubjects);
+      toast({
+        title: "Subject updated",
+        description: `${subject.name} has been renamed to ${newName.trim()}`,
+      });
+    }
+    setEditingSubject(null);
   };
 
   const handleOpenAddDialog = () => {
-    setEditingSubject(null);
-    setShowAddDialog(true);
+    const newName = prompt("Enter subject name:");
+    if (newName && newName.trim()) {
+      const newSubject: Subject = {
+        id: Date.now().toString(),
+        name: newName.trim(),
+        totalClasses: 0,
+        attendedClasses: 0,
+        minimumAttendance: 75,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      const updatedSubjects = [...subjects, newSubject];
+      setSubjects(updatedSubjects);
+      saveSubjects(updatedSubjects);
+      
+      toast({
+        title: "Subject added",
+        description: `${newName.trim()} has been added to your subjects.`,
+      });
+    }
   };
 
   return (
@@ -208,15 +207,15 @@ const Index = () => {
         onAddSubject={handleOpenAddDialog}
       />
       
-      <main className="container py-6">
+      <main className="container px-4 py-6 max-w-7xl mx-auto mt-4">
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="text-white text-lg">Loading your attendance data...</div>
+            <div className="text-white text-base sm:text-lg">Loading your attendance data...</div>
           </div>
         ) : subjects.length === 0 ? (
           <EmptyState onAddSubject={handleOpenAddDialog} />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {subjects.map((subject) => (
               <SubjectCard
                 key={subject.id}
@@ -232,13 +231,6 @@ const Index = () => {
           </div>
         )}
       </main>
-
-      <AddSubjectDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        onAddSubject={handleAddSubject}
-        editingSubject={editingSubject}
-      />
     </div>
   );
 };
