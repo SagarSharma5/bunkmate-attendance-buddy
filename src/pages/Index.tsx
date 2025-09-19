@@ -3,11 +3,13 @@ import { Subject } from "@/types/subject";
 import { getStoredSubjects, saveSubjects, getStorageInfo } from "@/lib/storage";
 import { Header } from "@/components/Header";
 import { SubjectCard } from "@/components/SubjectCard";
+import { AddSubjectDialog } from "@/components/AddSubjectDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -60,6 +62,31 @@ const Index = () => {
     return true;
   };
 
+  const handleAddSubject = (subject: Subject) => {
+    let updatedSubjects;
+    
+    if (editingSubject) {
+      updatedSubjects = subjects.map(s => s.id === subject.id ? subject : s);
+      setEditingSubject(null);
+      toast({
+        title: "Subject updated",
+        description: `${subject.name} has been updated successfully.`,
+      });
+    } else {
+      updatedSubjects = [...subjects, subject];
+      toast({
+        title: "Subject added",
+        description: `${subject.name} has been added to your tracker.`,
+      });
+    }
+    
+    const success = performSave(updatedSubjects, editingSubject ? "subject update" : "subject addition");
+    if (!success) {
+      // Reset editing state even if save failed
+      setEditingSubject(null);
+    }
+  };
+
   const handleAttended = (subjectId: string) => {
     const updatedSubjects = subjects.map(subject =>
       subject.id === subjectId
@@ -72,13 +99,7 @@ const Index = () => {
         : subject
     );
     
-    const success = performSave(updatedSubjects, "attendance update");
-    if (success) {
-      toast({
-        title: "Class attended",
-        description: "Attended class count increased.",
-      });
-    }
+    performSave(updatedSubjects, "attendance update");
   };
 
   const handleMissed = (subjectId: string) => {
@@ -92,13 +113,7 @@ const Index = () => {
         : subject
     );
     
-    const success = performSave(updatedSubjects, "missed class update");
-    if (success) {
-      toast({
-        title: "Class missed",
-        description: "Missed class count increased.",
-      });
-    }
+    performSave(updatedSubjects, "missed class update");
   };
 
   const handleAttendedDecrement = (subjectId: string) => {
@@ -114,13 +129,7 @@ const Index = () => {
       return subject;
     });
     
-    const success = performSave(updatedSubjects, "attendance decrement");
-    if (success) {
-      toast({
-        title: "Attendance updated",
-        description: "Attended class count decreased.",
-      });
-    }
+    performSave(updatedSubjects, "attendance decrement");
   };
 
   const handleMissedDecrement = (subjectId: string) => {
@@ -135,13 +144,7 @@ const Index = () => {
       return subject;
     });
     
-    const success = performSave(updatedSubjects, "missed class decrement");
-    if (success) {
-      toast({
-        title: "Attendance updated",
-        description: "Missed class count decreased.",
-      });
-    }
+    performSave(updatedSubjects, "missed class decrement");
   };
 
   const handleDeleteSubject = (subjectId: string) => {
@@ -159,46 +162,12 @@ const Index = () => {
 
   const handleEditSubject = (subject: Subject) => {
     setEditingSubject(subject);
-    // Create inline form for editing
-    const newName = prompt("Enter new subject name:", subject.name);
-    if (newName && newName.trim()) {
-      const updatedSubjects = subjects.map(s => 
-        s.id === subject.id 
-          ? { ...s, name: newName.trim() }
-          : s
-      );
-      setSubjects(updatedSubjects);
-      saveSubjects(updatedSubjects);
-      toast({
-        title: "Subject updated",
-        description: `${subject.name} has been renamed to ${newName.trim()}`,
-      });
-    }
-    setEditingSubject(null);
+    setShowAddDialog(true);
   };
 
   const handleOpenAddDialog = () => {
-    const newName = prompt("Enter subject name:");
-    if (newName && newName.trim()) {
-      const newSubject: Subject = {
-        id: Date.now().toString(),
-        name: newName.trim(),
-        totalClasses: 0,
-        attendedClasses: 0,
-        minimumAttendance: 75,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const updatedSubjects = [...subjects, newSubject];
-      setSubjects(updatedSubjects);
-      saveSubjects(updatedSubjects);
-      
-      toast({
-        title: "Subject added",
-        description: `${newName.trim()} has been added to your subjects.`,
-      });
-    }
+    setEditingSubject(null);
+    setShowAddDialog(true);
   };
 
   return (
@@ -231,6 +200,13 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      <AddSubjectDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onAddSubject={handleAddSubject}
+        editingSubject={editingSubject}
+      />
     </div>
   );
 };
